@@ -1,0 +1,293 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>K1ngstar · Opening + Directory Preview (Desktop)</title>
+  <style>
+    :root{
+      --bg-0:#0a0014; --pink:#ff5ccb; --sun:#ffd36e; --ink:#eaf6ff; --muted:#9fb3c8;
+      --card:#0f0b1a80; --glass: blur(10px) saturate(1.2); --radius:20px; --shadow:0 12px 40px rgba(0,0,0,.35);
+    }
+    *{box-sizing:border-box}
+    html,body{height:100%}
+    body{margin:0; background:var(--bg-0); color:var(--ink); font:16px/1.6 system-ui,-apple-system,Segoe UI,Roboto,Helvetica,Arial,"PingFang SC","Hiragino Sans GB","Microsoft YaHei",sans-serif; overflow-x:hidden}
+
+    /* ===== 固定背景层（滚动时一直在后面） ===== */
+    .scene{position:fixed; inset:0; overflow:hidden; pointer-events:none; z-index:0}
+    .sky{position:absolute; inset:0; background:
+      radial-gradient(1200px 600px at 50% 80%, rgba(0,209,255,.65), transparent 60%),
+      radial-gradient(900px 480px at 40% 78%, rgba(122,59,255,.45), transparent 60%),
+      radial-gradient(1000px 520px at 60% 76%, rgba(255,92,203,.4), transparent 60%),
+      linear-gradient(#1b0d2e, #0a0014 60%)}
+
+    /* 太阳：竖向“落入地平线” */
+    .sun{position:absolute; left:50%; top:46%; width:min(52vmin,560px); height:min(52vmin,560px); transform:translate(-50%,-50%); border-radius:50%; z-index:1;
+      background: repeating-linear-gradient(to bottom, rgba(255,255,255,.0) 0 6px, rgba(0,0,0,.55) 6px 10px),
+                  radial-gradient(circle at 50% 60%, var(--sun), var(--pink) 60%, transparent 62%);
+      box-shadow:0 0 60px 20px rgba(255,120,180,.35),0 0 140px 40px rgba(255,120,180,.25) inset; mix-blend-mode:screen; opacity:.95;
+      animation: sunDip 8s ease-in-out infinite; will-change: top, filter, transform;}
+    @keyframes sunDip{0%{top:46%;filter:brightness(1)}50%{top:60%;filter:brightness(.9);transform:translate(-50%,-50%) scale(.98)}100%{top:46%;filter:brightness(1)}}
+
+    /* 网格道路（静态旧版风格） */
+    .grid{position:absolute; left:0; right:0; bottom:-2px; height:56vh; perspective:900px; z-index:2}
+    .grid::before{content:""; position:absolute; inset:0; transform-origin:50% 100%; transform:rotateX(70deg);
+      background:
+        linear-gradient(transparent 60%, rgba(255,255,255,.08)),
+        repeating-linear-gradient(to right, rgba(122,59,255,.65) 0 2px, transparent 2px 120px),
+        repeating-linear-gradient(to top,   rgba(0,209,255,.6) 0 2px, transparent 2px 120px);
+      background-blend-mode:screen; filter:drop-shadow(0 0 10px rgba(122,59,255,.65));}
+
+    /* 云层（像素赛博） */
+    svg.clouds{position:absolute; inset:0; pointer-events:none; mix-blend-mode:screen; opacity:.8; z-index:3}
+    .clouds rect{shape-rendering:crispEdges}
+    .layer{animation: drift 40s linear infinite;} .layer.b{animation-duration:56s; opacity:.7} .layer.c{animation-duration:70s; opacity:.55}
+    @keyframes drift{from{transform:translateX(-10%)} to{transform:translateX(10%)}}
+
+    /* ===== 前景内容（在背景之上滚动） ===== */
+    .hero{position:relative; z-index:5; display:flex; align-items:center; justify-content:center; min-height:64vh; text-align:center; padding-top:8vh}
+    .logo{font-weight:800; letter-spacing:.08em; font-size: clamp(36px, 8vw, 96px); position:relative; text-shadow:0 0 14px rgba(255,255,255,.35),0 0 28px rgba(0,209,255,.4),0 0 52px rgba(122,59,255,.35)}
+    .logo::before,.logo::after{content:attr(data-text); position:absolute; left:0; top:0}
+    .logo::before{color:#7be1ff; transform:translateX(1px); mix-blend-mode:screen; opacity:.6}
+    .logo::after{color:#ff86e1; transform:translateX(-1px); mix-blend-mode:screen; opacity:.5}
+    .sign{margin-top:12px; font-size:clamp(14px, 3.2vw, 28px); font-weight:500; color:var(--muted); text-shadow:0 0 10px rgba(0,209,255,.45)}
+
+    .wrap{position:relative; z-index:5; max-width:1160px; margin:0 auto; padding:24px 16px 120px}
+    .card{background:var(--card); -webkit-backdrop-filter:var(--glass); backdrop-filter:var(--glass); border:1px solid rgba(255,255,255,.08); border-radius:var(--radius); box-shadow:var(--shadow); overflow:hidden}
+    .profile{display:grid; grid-template-columns:96px 1fr auto; gap:16px; padding:18px; align-items:center}
+    .avatar{width:96px; height:96px; border-radius:16px; background:linear-gradient(135deg,#3a1b62,#1b2750); border:1px solid rgba(255,255,255,.15)}
+
+    /* 筛选器 */
+    .filters{display:flex; flex-wrap:wrap; gap:10px; padding:16px; align-items:center; margin-top:14px}
+    .chip{display:inline-flex; align-items:center; gap:8px; padding:8px 12px; border-radius:999px; background:#1b1430; border:1px solid rgba(255,255,255,.08); cursor:pointer; user-select:none}
+    .chip.active{background:#422a6b; box-shadow:0 0 0 1px rgba(255,255,255,.1) inset}
+    .search{margin-left:auto; min-width:200px}
+    .search input{width:100%; padding:10px 12px; border-radius:12px; border:1px solid rgba(255,255,255,.12); background:#0d0a16; color:#eaf6ff}
+    .reset{margin-left:6px; padding:8px 12px; border-radius:10px; border:1px solid rgba(255,255,255,.12); background:#0d0a16; color:#9fb3c8}
+
+    /* 纵向叠卡 */
+    .stack{display:grid; gap:16px; padding:16px;}
+    .work{display:grid; grid-template-columns: min(36%, 420px) 1fr; min-height:200px; background:rgba(15,11,26,.5); -webkit-backdrop-filter:blur(10px) saturate(1.2); backdrop-filter:blur(10px) saturate(1.2); border:1px solid rgba(255,255,255,.08); border-radius:20px; box-shadow:0 12px 40px rgba(0,0,0,.35); overflow:hidden}
+    .cover{position:relative; overflow:hidden}
+    .cover::before{content:""; position:absolute; inset:0; background:radial-gradient(120% 120% at 20% 0%, rgba(255,120,210,.45), transparent 50%), radial-gradient(120% 120% at 100% 100%, rgba(0,209,255,.45), transparent 50%), linear-gradient(135deg, #201139, #101225 60%); filter:saturate(1.2)}
+    .work .body{padding:18px 18px 16px; display:flex; flex-direction:column; gap:10px}
+    .title{font-size:18px; font-weight:700; letter-spacing:.02em}
+    .meta{color:#9fb3c8; font-size:14px}
+    .tag-row{display:flex; flex-wrap:wrap; gap:8px}
+    .tag{background:#160f28; border:1px solid rgba(255,255,255,.08); padding:6px 10px; border-radius:999px; font-size:12px; color:#cdd7ff}
+    .tag-input{display:flex; gap:6px; margin-top:6px}
+    .tag-input input{flex:1; min-width:160px; padding:8px 10px; border-radius:10px; border:1px dashed rgba(255,255,255,.18); background:#0d0a16; color:#eaf6ff}
+    .tag-input button{padding:8px 12px; border-radius:10px; border:1px solid rgba(255,255,255,.12); background:#0d0a16; color:#9fb3c8}
+
+    /* ===== 开场（百叶） —— 延长字幕停留，不延长黑屏 ===== */
+    .intro{position:fixed; inset:0; background:#05030a; z-index:999; display:flex; align-items:center; justify-content:center}
+    .intro .brand{position:absolute; inset:0; display:flex; align-items:center; justify-content:center; color:#fff; pointer-events:none;}
+    .brand .word{font-weight:900; font-size: clamp(28px, 6vw, 72px); letter-spacing:.08em; text-shadow:0 0 24px rgba(255,92,203,.6), 0 0 48px rgba(0,209,255,.5); opacity:0; animation: brandIn 1.2s ease .1s forwards}
+    .brand .sub{position:absolute; top:62%; font-size:clamp(12px, 2.6vw, 22px); color:#c7d5ff; opacity:0; animation: subIn 1.2s ease .2s forwards}
+    @keyframes brandIn{from{opacity:0; transform:translateY(8px)} to{opacity:1; transform:none}}
+    @keyframes subIn{from{opacity:0; transform:translateY(6px)} to{opacity:1; transform:none}}
+
+    .tiles{position:absolute; inset:0; display:grid; grid-template-columns:repeat(12, 1fr); gap:0}
+    .tile{background:#0a0016; will-change:transform,opacity; transform-origin:50% 50%;}
+    .play .tile{animation: openTile 1.2s ease forwards;}
+    /* 从中间向两侧逐列开启 —— 延时推后，增加字幕停留时间 */
+    .tile[data-i="0"], .tile[data-i="11"]{animation-delay:4.7s}
+    .tile[data-i="1"], .tile[data-i="10"]{animation-delay:4.85s}
+    .tile[data-i="2"], .tile[data-i="9"]{animation-delay:5.0s}
+    .tile[data-i="3"], .tile[data-i="8"]{animation-delay:5.15s}
+    .tile[data-i="4"], .tile[data-i="7"]{animation-delay:5.3s}
+    .tile[data-i="5"], .tile[data-i="6"]{animation-delay:5.45s}
+    @keyframes openTile{0%{transform:scaleY(1)}100%{transform:scaleY(0)}}
+
+    .skip{position:absolute; right:14px; top:14px; z-index:1000; padding:8px 12px; border-radius:10px; border:1px solid rgba(255,255,255,.2); background:#0c0a18; color:#eaf6ff; cursor:pointer}
+    .skip:hover{filter:brightness(1.1)}
+
+    /* 降级 */
+    @media (prefers-reduced-motion: reduce){
+      .sun{animation:none}
+      .play .tile{animation:none}
+      .brand .word,.brand .sub{animation:none; opacity:1}
+    }
+  </style>
+</head>
+<body>
+  <!-- 开场层 -->
+  <div class="intro" id="intro" aria-hidden="true">
+    <button class="skip" id="skip" aria-label="跳过开场">Skip</button>
+    <div class="brand">
+      <div class="word">K1ngstar</div>
+      <div class="sub">Design with heart</div>
+    </div>
+    <div class="tiles" id="tiles">
+      <div class="tile" data-i="0"></div><div class="tile" data-i="1"></div><div class="tile" data-i="2"></div><div class="tile" data-i="3"></div><div class="tile" data-i="4"></div><div class="tile" data-i="5"></div><div class="tile" data-i="6"></div><div class="tile" data-i="7"></div><div class="tile" data-i="8"></div><div class="tile" data-i="9"></div><div class="tile" data-i="10"></div><div class="tile" data-i="11"></div>
+    </div>
+  </div>
+
+  <!-- 固定背景场景 -->
+  <div class="scene" aria-hidden="true">
+    <div class="sky"></div>
+    <div class="sun"></div>
+    <div class="grid"></div>
+    <svg class="clouds" viewBox="0 0 1000 1000" preserveAspectRatio="none">
+      <defs>
+        <rect id="px" width="6" height="6" rx="0" ry="0"></rect>
+        <linearGradient id="c1" x1="0" x2="1">
+          <stop offset="0%" stop-color="#ff9ad9" stop-opacity="0.95"/>
+          <stop offset="100%" stop-color="#ff5ccb" stop-opacity="0.95"/>
+        </linearGradient>
+      </defs>
+      <g class="layer a" fill="url(#c1)">
+        <g transform="translate(120,560)"><use href="#px" x="0" y="0"/><use href="#px" x="6" y="0"/><use href="#px" x="12" y="0"/><use href="#px" x="18" y="0"/><use href="#px" x="24" y="0"/><use href="#px" x="30" y="0"/><use href="#px" x="12" y="6"/><use href="#px" x="18" y="6"/><use href="#px" x="24" y="6"/><use href="#px" x="30" y="6"/><use href="#px" x="-6" y="6"/></g>
+        <g transform="translate(720,520) scale(2)"><use href="#px" x="0" y="0"/><use href="#px" x="6" y="0"/><use href="#px" x="12" y="0"/><use href="#px" x="18" y="0"/><use href="#px" x="24" y="0"/><use href="#px" x="30" y="0"/><use href="#px" x="36" y="0"/><use href="#px" x="12" y="6"/><use href="#px" x="18" y="6"/><use href="#px" x="24" y="6"/><use href="#px" x="30" y="6"/><use href="#px" x="-6" y="6"/><use href="#px" x="0" y="12"/><use href="#px" x="6" y="12"/></g>
+      </g>
+      <g class="layer b" fill="url(#c1)">
+        <g transform="translate(280,450) scale(1.6)"><use href="#px" x="0" y="0"/><use href="#px" x="6" y="0"/><use href="#px" x="12" y="0"/><use href="#px" x="18" y="0"/><use href="#px" x="24" y="0"/><use href="#px" x="6" y="6"/><use href="#px" x="12" y="6"/><use href="#px" x="18" y="6"/></g>
+      </g>
+      <g class="layer c" fill="url(#c1)" opacity=".5">
+        <g transform="translate(80,400) scale(1.2)"><use href="#px" x="0" y="0"/><use href="#px" x="6" y="0"/><use href="#px" x="12" y="0"/><use href="#px" x="18" y="0"/></g>
+      </g>
+    </svg>
+  </div>
+
+  <!-- 前景内容（目录等） -->
+  <header class="hero" role="banner">
+    <div>
+      <div class="logo" aria-label="K1ngstar" data-text="K1ngstar">K1ngstar</div>
+      <div class="sign">Design with heart</div>
+    </div>
+  </header>
+
+  <main class="wrap" role="main">
+    <section class="card profile">
+      <div class="avatar" aria-hidden="true"></div>
+      <div>
+        <h2>K1ngstar · Product / Motion / Visual</h2>
+        <p>Design with heart · 用心做设计</p>
+      </div>
+      <a class="skip" href="#" id="replay">重播开场</a>
+    </section>
+
+    <!-- 筛选器（目录） -->
+    <section class="card filters" id="filters">
+      <div class="chip" data-tag="interaction">交互</div>
+      <div class="chip" data-tag="visual">视觉</div>
+      <div class="chip" data-tag="typography">字体</div>
+      <div class="chip" data-tag="ip">IP/角色</div>
+      <div class="chip" data-tag="smart">智能产品</div>
+      <div class="chip" data-tag="automotive">汽车</div>
+      <div class="chip" data-tag="packaging">包装</div>
+      <div class="chip" data-tag="ai">AI/生成式</div>
+      <div class="search"><input type="search" id="q" placeholder="搜索标题 / 标签"/></div>
+      <button class="reset" id="reset">重置</button>
+    </section>
+
+    <!-- 纵向叠卡列表：6 个占位（可替换为真实内容） -->
+    <section class="stack" id="stack">
+      <article class="card work" data-tags="interaction visual ai">
+        <div class="cover" aria-hidden="true"></div>
+        <div class="body">
+          <div class="title">Project #1 · Vapor UI Kit</div>
+          <div class="meta">2024 · 桌面 / 移动 · 角色：交互 & 视觉</div>
+          <div class="tag-row"><span class="tag">交互</span><span class="tag">视觉</span><span class="tag">AI</span></div>
+          <div class="tag-input"><input type="text" placeholder="添加自定义标签，回车确认" aria-label="添加标签"/><button data-add>添加</button></div>
+        </div>
+      </article>
+
+      <article class="card work" data-tags="ip visual">
+        <div class="cover"></div>
+        <div class="body">
+          <div class="title">Project #2 · Mascot / IP Exploration</div>
+          <div class="meta">2023 · 角色：IP/角色 · 视觉</div>
+          <div class="tag-row"><span class="tag">IP</span><span class="tag">视觉</span></div>
+          <div class="tag-input"><input type="text" placeholder="添加自定义标签"/><button data-add>添加</button></div>
+        </div>
+      </article>
+
+      <article class="card work" data-tags="smart interaction">
+        <div class="cover"></div>
+        <div class="body">
+          <div class="title">Project #3 · Smart Home Control</div>
+          <div class="meta">2022 · 角色：交互 · 智能产品</div>
+          <div class="tag-row"><span class="tag">智能产品</span><span class="tag">交互</span></div>
+          <div class="tag-input"><input type="text" placeholder="添加自定义标签"/><button data-add>添加</button></div>
+        </div>
+      </article>
+
+      <article class="card work" data-tags="automotive visual">
+        <div class="cover"></div>
+        <div class="body">
+          <div class="title">Project #4 · Automotive HUD Visual</div>
+          <div class="meta">2021 · 视觉 · 汽车</div>
+          <div class="tag-row"><span class="tag">汽车</span><span class="tag">视觉</span></div>
+          <div class="tag-input"><input type="text" placeholder="添加自定义标签"/><button data-add>添加</button></div>
+        </div>
+      </article>
+
+      <article class="card work" data-tags="packaging visual typography">
+        <div class="cover"></div>
+        <div class="body">
+          <div class="title">Project #5 · Packaging & Type</div>
+          <div class="meta">2020 · 包装 · 字体</div>
+          <div class="tag-row"><span class="tag">包装</span><span class="tag">字体</span></div>
+          <div class="tag-input"><input type="text" placeholder="添加自定义标签"/><button data-add>添加</button></div>
+        </div>
+      </article>
+
+      <article class="card work" data-tags="visual ai">
+        <div class="cover"></div>
+        <div class="body">
+          <div class="title">Project #6 · GenAI Visual Study</div>
+          <div class="meta">2024 · 视觉 · AI</div>
+          <div class="tag-row"><span class="tag">视觉</span><span class="tag">AI</span></div>
+          <div class="tag-input"><input type="text" placeholder="添加自定义标签"/><button data-add>添加</button></div>
+        </div>
+      </article>
+    </section>
+  </main>
+
+  <script>
+    // 开场逻辑：字幕先出现并停留较久，再开百叶
+    const intro = document.getElementById('intro');
+    const tiles = document.getElementById('tiles');
+    const skipBtn = document.getElementById('skip');
+    const replay = document.getElementById('replay');
+    const prefersReduce = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+    const shouldSkip = sessionStorage.getItem('introDone') === '1' || prefersReduce;
+
+    function finishIntro(){ intro.style.display = 'none'; sessionStorage.setItem('introDone','1'); }
+    function playIntro(){ if(shouldSkip){ finishIntro(); return; } requestAnimationFrame(()=> tiles.classList.add('play')); setTimeout(finishIntro, 6900); }
+    function replayIntro(){ sessionStorage.removeItem('introDone'); intro.style.display = 'flex'; tiles.classList.remove('play'); setTimeout(()=> tiles.classList.add('play'), 60); setTimeout(finishIntro, 6900); }
+
+    skipBtn.addEventListener('click', finishIntro);
+    if(replay) replay.addEventListener('click', (e)=>{ e.preventDefault(); replayIntro(); });
+    document.addEventListener('DOMContentLoaded', playIntro);
+
+    // 目录过滤 & 自定义标签
+    const chips = [...document.querySelectorAll('.chip')];
+    const cards = [...document.querySelectorAll('.work')];
+    const q = document.getElementById('q');
+    const reset = document.getElementById('reset');
+    function applyFilters(){
+      if(!cards.length) return;
+      const active = chips.filter(c=>c.classList.contains('active')).map(c=>c.dataset.tag);
+      const text = (q && q.value ? q.value : '').trim().toLowerCase();
+      cards.forEach(card=>{
+        const tags = ((card.dataset.tags||'').trim().split(' ').filter(Boolean));
+        const title = (card.querySelector('.title')?.textContent||'').toLowerCase();
+        const chipsText = [...card.querySelectorAll('.tag')].map(t=>t.textContent.toLowerCase()).join(' ');
+        const matchTags = active.length ? active.every(t=> tags.includes(t)) : true;
+        const matchText = text ? (title.includes(text) || chipsText.includes(text)) : true;
+        card.style.display = (matchTags && matchText) ? 'grid' : 'none';
+      });
+    }
+    chips.forEach(ch=> ch.addEventListener('click', ()=>{ ch.classList.toggle('active'); applyFilters(); }));
+    if(q) q.addEventListener('input', applyFilters);
+    if(reset) reset.addEventListener('click', ()=>{ chips.forEach(c=>c.classList.remove('active')); if(q) q.value=''; applyFilters(); });
+    document.querySelectorAll('.tag-input').forEach(box=>{
+      const input = box.querySelector('input'); const btn = box.querySelector('[data-add]'); const row = box.previousElementSibling; const card = box.closest('.work');
+      function addTag(){ const val=(input.value||'').trim(); if(!val) return; const span=document.createElement('span'); span.className='tag'; span.textContent=val; row.appendChild(span); const slug=val.split(' ').filter(Boolean).join('-').toLowerCase(); card.dataset.tags = ((card.dataset.tags||'')+' '+slug).trim(); input.value=''; applyFilters(); }
+      btn.addEventListener('click', addTag); input.addEventListener('keydown', e=>{ if(e.key==='Enter'){ addTag(); }});
+    });
+  </script>
+</body>
+</html>
