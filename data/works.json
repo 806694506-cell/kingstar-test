@@ -1,0 +1,22 @@
+{
+  "works": [
+    {
+      "title": "Vapor UI Kit",
+      "year": 2024,
+      "cover": "img/vapor-ui.jpg",
+      "role": "交互 · 视觉",
+      "tags": ["interaction", "visual", "ai"],
+      "desc": "一套蒸汽波风格的多端 UI 组件。",
+      "link": "#"
+    },
+    {
+      "title": "Mascot / IP Exploration",
+      "year": 2023,
+      "cover": "img/mascot.jpg",
+      "role": "IP/角色 · 视觉",
+      "tags": ["ip", "visual"],
+      "desc": "品牌吉祥物角色探索与延展。",
+      "link": "#"
+    }
+  ]
+}
